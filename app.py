@@ -69,7 +69,36 @@ if st.button("🔍 Analyze"):
         st.warning("Enter something!")
     else:
         result = predict(text)
-        st.success(f"Result: {result}")
+        
+    if result.lower() == "positive":
+        st.markdown(f"""
+        <div style="padding:15px;border-radius:10px;background-color:#00c853;color:white;text-align:center;font-size:18px;">
+            {result}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+elif result.lower() == "negative":
+    st.markdown(
+        f"""
+        <div style="padding:15px;border-radius:10px;background-color:#d50000;color:white;text-align:center;font-size:18px;">
+            {result}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+else:  # Neutral
+    st.markdown(
+        f"""
+        <div style="padding:15px;border-radius:10px;background-color:#ffd600;color:black;text-align:center;font-size:18px;">
+            {result}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
 
 st.markdown('</div>', unsafe_allow_html=True)
 
