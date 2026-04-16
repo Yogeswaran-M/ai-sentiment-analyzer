@@ -69,7 +69,14 @@ if st.button("🔍 Analyze"):
         st.warning("Enter something!")
     else:
         result = predict(text)
-        st.success(f"Result: {result}")
+
+        # ✅ COLOR CHANGE LOGIC
+        if result == "Positive":
+            st.success(f"Result: {result}")
+        elif result == "Negative":
+            st.error(f"Result: {result}")
+        else:
+            st.warning(f"Result: {result}")
 
 st.markdown('</div>', unsafe_allow_html=True)
 
