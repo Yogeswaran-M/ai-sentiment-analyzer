@@ -1,130 +1,214 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from transformers import pipeline
+from deep_translator import GoogleTranslator
+import time
 
-# ⚙️ Page config
-st.set_page_config(page_title="Sentiment Analyzer", page_icon="💬")
+# -----------------------
+# PAGE CONFIG (FIRST)
+# -----------------------
+st.set_page_config(page_title="🔥 Ultimate Analyzer", page_icon="🔥")
 
-# 🎨 PRO UI STYLE
-st.markdown("""
-<style>
-.stApp {
-    background: linear-gradient(135deg, #0f2027, #2c5364, #1c1c1c);
-    color: white;
-}
-.glass {
-    background: rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(12px);
-    border-radius: 15px;
-    padding: 20px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-    border: 1px solid rgba(255,255,255,0.1);
-    margin-bottom: 20px;
-}
-h1 {
-    text-align: center;
-    font-size: 42px;
-    color: #00f2fe;
-}
-.stButton>button {
-    background: linear-gradient(45deg, #00f2fe, #4facfe);
-    color: white;
-    border-radius: 25px;
-    padding: 10px 25px;
-    border: none;
-    transition: 0.3s;
-}
-.stButton>button:hover {
-    transform: scale(1.05);
-    box-shadow: 0 0 15px #00f2fe;
-}
-[data-testid="stFileUploader"] {
-    background: rgba(255,255,255,0.05);
-    padding: 15px;
-    border-radius: 15px;
-    border: 1px dashed #00f2fe;
-}
-</style>
-""", unsafe_allow_html=True)
+# -----------------------
+# LOAD MODELS (FAST)
+# -----------------------
+@st.cache_resource
+def load_models():
+    vader = SentimentIntensityAnalyzer()
+    bert = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
+    return vader, bert
 
-# 🧠 TITLE
-st.title("💬 Sentiment Analyzer")
+vader, bert = load_models()
 
-# ✍️ TEXT INPUT
-st.markdown('<div class="glass">', unsafe_allow_html=True)
+# -----------------------
+# TRANSLATE
+# -----------------------
+def translate_text(text):
+    try:
+        return GoogleTranslator(source='auto', target='en').translate(text)
+    except:
+        return text
 
-text = st.text_area("Enter your text 👇")
+# -----------------------
+# WORD LIST
+# -----------------------
+pos_words = ["good","super","semma","mass","love","awesome"]
+neg_words = ["bad","waste","mokke","worst","hate"]
 
-def predict(text):
-    text = text.lower()
-    if "good" in text or "love" in text or "happy" in text:
-        return "Positive"
-    elif "bad" in text or "hate" in text or "sad" in text:
-        return "Negative"
-    else:
-        return "Neutral"
-
-if st.button("🔍 Analyze"):
-    if text.strip() == "":
-        st.warning("Enter something!")
-    else:
-        result = predict(text)
-
-        # ✅ COLOR CHANGE LOGIC
-        if result == "Positive":
-            st.success(f"Result: {result}")
-        elif result == "Negative":
-            st.error(f"Result: {result}")
+# -----------------------
+# INLINE HIGHLIGHT
+# -----------------------
+def highlight_text(text):
+    words = text.split()
+    new = []
+    for w in words:
+        if w.lower() in pos_words:
+            new.append(f"<span style='color:lightgreen;font-weight:bold'>{w}</span>")
+        elif w.lower() in neg_words:
+            new.append(f"<span style='color:#ff4d4d;font-weight:bold'>{w}</span>")
         else:
-            st.warning(f"Result: {result}")
+            new.append(w)
+    return " ".join(new)
 
-st.markdown('</div>', unsafe_allow_html=True)
+# -----------------------
+# EXPLAIN WORDS
+# -----------------------
+def explain_words(text):
+    words = text.lower().split()
+    pos = [w for w in words if w in pos_words]
+    neg = [w for w in words if w in neg_words]
+    return pos, neg
 
-# 📂 CSV UPLOAD
-st.markdown('<div class="glass">', unsafe_allow_html=True)
+# -----------------------
+# PREDICT
+# -----------------------
+def predict(text):
+    text_en = translate_text(text)
 
-st.markdown("### 📂 Upload CSV for Bulk Analysis")
+    v = vader.polarity_scores(text_en)
+    b = bert(text_en)[0]
+
+    pos_score = v['pos']
+    neg_score = v['neg']
+    neu_score = v['neu']
+    comp = v['compound']
+
+    sentiment = "Positive" if b['label']=="POSITIVE" else "Negative"
+
+    if comp >= 0.6:
+        sentiment = "Very Positive"
+    elif comp <= -0.6:
+        sentiment = "Very Negative"
+    elif -0.05 < comp < 0.05:
+        sentiment = "Neutral"
+
+    if pos_score > 0 and neg_score > 0:
+        sentiment = "Mixed"
+
+    return sentiment, pos_score, neg_score, neu_score, comp, b
+
+# -----------------------
+# UI
+# -----------------------
+st.title("🔥 Smart Sentiment Analyzer")
+
+text = st.text_area("Enter Tamil + English text")
+
+if st.button("Analyze"):
+    if text.strip()=="":
+        st.warning("Enter text")
+    else:
+        with st.spinner("⚡ AI analyzing..."):
+            sentiment, pos_s, neg_s, neu_s, comp, b = predict(text)
+
+        st.subheader(f"Result: {sentiment}")
+
+        # INLINE TEXT
+        st.markdown("### 📝 Highlighted Text")
+        st.markdown(highlight_text(text), unsafe_allow_html=True)
+
+        # SCORES
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Positive", round(pos_s,2))
+        col2.metric("Negative", round(neg_s,2))
+        col3.metric("Neutral", round(neu_s,2))
+
+        st.metric("Compound Score", comp)
+        st.write(f"BERT: {b['label']} ({b['score']:.2f})")
+
+        # BAR
+        fig, ax = plt.subplots()
+        ax.bar(["Positive","Negative","Neutral"], [pos_s, neg_s, neu_s])
+        st.pyplot(fig)
+
+        # -----------------------
+        # EXPLANATION UI
+        # -----------------------
+        st.markdown("### 🔍 Explanation")
+        pos_w, neg_w = explain_words(text)
+
+        if pos_w:
+            st.markdown(f"""
+            <div style='background:rgba(0,255,0,0.15); padding:15px; border-radius:10px'>
+            <b>🟢 Positive Words:</b> {", ".join(pos_w)}<br>
+            <span style='color:lightgreen'>These words caused positive sentiment</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        if neg_w:
+            st.markdown(f"""
+            <div style='background:rgba(255,0,0,0.15); padding:15px; border-radius:10px'>
+            <b>🔴 Negative Words:</b> {", ".join(neg_w)}<br>
+            <span style='color:#ff4d4d'>These words caused negative sentiment</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+# -----------------------
+# CSV
+# -----------------------
+st.write("## 📂 Upload CSV")
 
 file = st.file_uploader("", type=["csv"])
 
-if file is not None:
+if file:
+    df = pd.read_csv(file)
 
-    # 🔥 Accurate file size
-    file_bytes = len(file.getvalue())
-    size_text = f"{round(file_bytes/1024,2)} KB"
+    progress = st.progress(0)
 
-    st.success(f"✅ {file.name} ({size_text})")
+    texts = df["text"].astype(str)
 
-    try:
-        df = pd.read_csv(file)
+    scores = []
+    sentiments = []
 
-        if "text" not in df.columns:
-            st.error("CSV must contain 'text' column")
+    for i, t in enumerate(texts):
+        v = vader.polarity_scores(t)
+        comp = v['compound']
 
+        if comp >= 0.6:
+            s = "Very Positive"
+        elif comp <= -0.6:
+            s = "Very Negative"
+        elif -0.05 < comp < 0.05:
+            s = "Neutral"
         else:
-            # ⚡ ULTRA FAST VECTORIZED METHOD
-            df["text"] = df["text"].astype(str).str.lower()
+            s = "Positive" if comp > 0 else "Negative"
 
-            df["sentiment"] = "Neutral"
+        scores.append(comp)
+        sentiments.append(s)
 
-            df.loc[df["text"].str.contains("good|love|happy"), "sentiment"] = "Positive"
-            df.loc[df["text"].str.contains("bad|hate|sad"), "sentiment"] = "Negative"
+        progress.progress((i+1)/len(texts))
 
-            st.success("⚡ Analysis completed instantly!")
+    df["score"] = scores
+    df["sentiment"] = sentiments
 
-            st.write("### 📊 Analyzed Data")
-            st.dataframe(df)
+    st.success("✅ Fast Analysis Done")
+    st.dataframe(df)
 
-            # 📊 Pie chart
-            st.write("### 📈 Sentiment Distribution")
+    counts = df["sentiment"].value_counts()
 
-            counts = df["sentiment"].value_counts()
+    # PIE
+    st.write("### 🥧 Pie Chart")
+    fig1, ax1 = plt.subplots()
+    ax1.pie(counts, labels=counts.index, autopct='%1.1f%%')
+    st.pyplot(fig1)
 
-            fig, ax = plt.subplots()
-            ax.pie(counts, labels=counts.index, autopct='%1.1f%%')
-            st.pyplot(fig)
+    # BAR
+    st.write("### 📊 Bar Chart")
+    fig2, ax2 = plt.subplots()
+    counts.plot(kind='bar', ax=ax2)
+    st.pyplot(fig2)
 
-    except Exception as e:
-        st.error(f"Error: {e}")
+    # HIST
+    st.write("### 📈 Distribution")
+    fig3, ax3 = plt.subplots()
+    ax3.hist(df["score"], bins=10)
+    st.pyplot(fig3)
 
-st.markdown('</div>', unsafe_allow_html=True)
+    # TREND
+    st.write("### 📉 Trend")
+    df["index"] = range(len(df))
+    fig4, ax4 = plt.subplots()
+    ax4.plot(df["index"], df["score"])
+    st.pyplot(fig4)
