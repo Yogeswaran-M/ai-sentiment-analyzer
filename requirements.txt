@@ -1,3 +1,7 @@
 streamlit
 pandas
 matplotlib
+vaderSentiment
+transformers
+torch
+deep-translator
