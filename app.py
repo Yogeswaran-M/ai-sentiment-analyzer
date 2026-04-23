@@ -5,6 +5,10 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from transformers import pipeline
 from deep_translator import GoogleTranslator
 import time
+import os
+
+port = int(os.environ.get("PORT", 8501))
+st.run(host="0.0.0.0", port=port)
 
 # -----------------------
 # PAGE CONFIG (FIRST)
