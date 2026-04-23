@@ -3,5 +3,5 @@ pandas
 matplotlib
 vaderSentiment
 transformers
-torch==2.1.0
+torch
 deep-translator
